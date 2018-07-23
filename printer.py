@@ -202,5 +202,5 @@ All other kwargs are passed to colorprinter._print.
         else:
             cls._print(out, **kwargs)
 
-# swith the print function
+# switch the print function
 print = colorprinter.print
