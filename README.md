@@ -2,6 +2,12 @@
 Random Python snippets that I write
 
 ## Items
+### DataFrameN.py
+
+Extends/Hybridizes `np.ndarray` and `pd.DataFrame` for an arbitrary number of dimensions.
+
+Includes `read_csv` functionality for 4D or less. Also allows for element-wise algebra for any dtype, only affect those that can be cast as a `float`.
+
 ### printer.py
 
 Extends the printer function.
