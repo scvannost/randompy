@@ -2,6 +2,11 @@
 Random Python snippets that I write
 
 ## Items
+### pyFramework.py
+Provide Entity Framework-like interfaces with MySQL databases.  
+#### usermgr.py
+A user management system for use with pyFramework
+
 ### DataFrameN.py
 
 Extends/Hybridizes `np.ndarray` and `pd.DataFrame` for an arbitrary number of dimensions.
@@ -26,4 +31,4 @@ I use this to see if different cell type counts for different samples could have
 
 Can also be given a list of observation matrices and returns the list of p-values.
 
-###### All math comes from Wikipedia.
+###### All maths come from Wikipedia.
