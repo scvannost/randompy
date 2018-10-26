@@ -2,11 +2,6 @@
 Random Python snippets that I write
 
 ## Items
-### pyFramework.py
-Provide Entity Framework-like interfaces with MySQL databases.  
-#### usermgr.py
-A user management system for use with pyFramework
-
 ### DataFrameN.py
 
 Extends/Hybridizes `np.ndarray` and `pd.DataFrame` for an arbitrary number of dimensions.
