@@ -62,6 +62,155 @@ from typing import Any, Dict, Iterable, List, Union
 escape_string = MySQLdb.escape_string
 
 
+
+class Table:
+	"""
+An object that represents a table in a MySQL database and provides a simple interface.
+One Table is made for each table in the Database.
+All data-returning methods call the db's `query` method and pass it all kwargs.
+
+Properties:
+	cols (List[Dict[str, str]]) - returns a list of dicts describing the columns
+	name (str) - returns the name of the table itself
+	col_names (List[str]) - returns a list of the names of the columns
+
+Methods:
+	count(where, **kwargs) - counts the entries that meet the criteria in @where
+	delete(where, **kwargs) - deletes the entries which meet the criteria in @where
+	distinct(fields, where, limit, orderby, **kwargs) - selects entries with distinct @fields
+		that meet the criteria in @where ordered by @orderby; only returns @limit entries max
+	insert(fields, extra, **kwargs) - inserts the values in @fields
+	select(fields, where, limit, groupby, orderby, **kwargs) - selects the specified @fields
+		for entries that meet the criteria in @where grouped by @groupby and ordered by @orderby;
+		only returns @limit entries max
+	update(fields, where, **kwargs) - updates the given @fields for entries that meet the
+		criteria in @where
+	join(tbl, on, alias, direction) - returns a Table that allows for querying on the inner/left/
+		right joined with @tbl aliased as @alias on @on
+
+	"""
+
+	def __init__(self, db, name: str, cols: list):
+		self._db = db
+		self._name = name
+		self._cols = cols
+
+	def __repr__(self):
+		"""
+Makes a str representation of self to display.
+		"""
+		return 'Table ' + self.name  + ': ' + ', '.join([i['Type'] + ' ' + i['Field'] for i in self._cols])
+
+	@property
+	def cols(self):
+		"""
+Returns a dict of column descriptions.
+		"""
+		return self._cols
+
+	@property
+	def name(self):
+		"""
+Returns the name of the table itself.
+		"""
+		return self._name
+	
+	@property
+	def col_names(self):
+		"""
+Returns a list of the column names.
+		"""
+		return [i['Field'] for i in self._cols]
+
+	def count(self, where: str = None, **kwargs):
+		"""
+Runs a 'count' SQL query on the table.
+@where specifies a condition to meet.
+		"""
+		where = 'WHERE ' + where if where else ''
+		return self._db.query('count', self._name, extra=where, **kwargs)
+
+	def delete(self, where: str = None, **kwargs):
+		"""
+Runs a 'delete' SQL query on the table.
+@where specifies a condition to meet.
+		"""
+		where = 'WHERE ' + where if where else ''
+		return self._db.query('delete', self._name, extra=where, **kwargs)
+
+	def distinct(self, fields = None, where: str = None, limit: int = None, orderby: str = None, **kwargs):
+		"""
+Runs a 'select distinct' SQL query on the table.
+@fields specifies what fields to be unique over as 'all' or list(str).
+@where specifies a condition to meet.
+@limit specifies the maximum number of rows to return.
+@orderby specifies what to order by.
+		"""
+		where = 'WHERE ' + where 		if where else ''
+		limit = 'LIMIT ' + str(limit)	if limit else ''
+		orderby = 'ORDER BY ' + orderby	if orderby else ''
+		return self._db.query('distinct', self._name, fields, where, **kwargs)
+
+	def insert(self, fields = None, extra: str = None, **kwargs):
+		"""
+Runs an 'insert' SQL query on the table.
+@fields specifies what values to insert as dict(field : value)
+@extra is tacked on the end of the query.
+		"""
+		return self._db.query('insert', self._name, fields, extra, **kwargs)
+
+	def select(self, fields = None, where: str = None, limit: int = None, groupby: str = None, orderby: str = None, **kwargs):
+		"""
+Runs a 'select' SQL query on the table.
+@fields specifies what fields to select as 'all' or list(str).
+@where specifies a condition to meet.
+@limit specifies the maximum number of rows to return.
+@groupby specifies what to group the data by
+@orderby specifies what to order by.
+		"""
+		where 	= 'WHERE ' + where 		if where else ''
+		limit 	= 'LIMIT ' + str(limit) if limit else ''
+		groupby = 'GROUP BY ' + groupby if groupby else ''
+		orderby = 'ORDER BY ' + orderby	if orderby else ''
+		return self._db.query('select', self._name, fields, ' '.join([where, limit, orderby, groupby]), **kwargs)
+
+	def update(self, fields = None, where: str = None, **kwargs):
+		"""
+Runs an 'update' SQL query on the table.
+@fields specifies what values to update to as dict(field : value)
+@where specifies a condition to meet.
+		"""
+		where = 'WHERE ' + where if where else ''
+		return self._db.query('update', self._name, fields, where, **kwargs)
+
+	def join(self, tbl, on: str, alias: str = None, direction: str = 'inner'):
+		"""
+Returns a Table of this table joined to @tbl.
+Returns None if there is an error.
+
+str @tbl is a Table object with .name and .cols{} properties.
+str @on specifies the joining condition.
+str @alias specifies the alias of @tbl.
+str @direction specifies 'inner', 'left', or 'right'; default 'inner'
+		"""
+		if not direction.lower() in ['inner', 'left', 'right']: return None
+
+		join = self.name + ' ' + direction.upper() + ' JOIN ' + tbl.name + ('AS ' + alias if alias else '') + ' ON ' + on
+		
+		cols = self.cols
+		for i in range(len(cols)):
+			cols[i]['Field'] = self.name + '.' + cols[i]['Field']
+
+		temp = tbl.cols
+		for i in range(len(temp)):
+			temp[i]['Field'] = tbl.name + '.' + temp[i]['Field']
+
+		cols += temp
+
+		return Table(self._db, join, cols)
+
+
+
 class Database:
 	"""
 An object that represents a MySQL database and allows for interaction with it.
@@ -472,7 +621,7 @@ bool @mk_class to create the class definition in dir `tables`; default True
 
 		if type(fields) is str:
 			sql += fields
-		elif type(fields) not is dict:
+		elif not type(fields) is dict:
 			sql += ', '.join(list(fields))
 		else: # is a dict
 			sql += ', '.join([k + ' ' + v for k,v in fields.items()])
@@ -671,7 +820,7 @@ bool @alter_class to also remake the class in `tables`; default True
 		self._tables += [getattr(self, name)]
 		return getattr(self, name)
 
-	def add_fk(self, name: str, table: str field: str, ref: str):
+	def add_fk(self, name: str, table: str, field: str, ref: str):
 		"""
 Adds a foreign key constraint.
 str @name is the name of the fk
@@ -695,155 +844,6 @@ str @table is the table
 			sql = 'ALTER TABLE ' + table + ' DROP FOREIGN KEY fk_' + name + ';'
 			self.sql_query(sql)
 		return self
-
-
-
-
-class Table:
-	"""
-An object that represents a table in a MySQL database and provides a simple interface.
-One Table is made for each table in the Database.
-All data-returning methods call the db's `query` method and pass it all kwargs.
-
-Properties:
-	cols (List[Dict[str, str]]) - returns a list of dicts describing the columns
-	name (str) - returns the name of the table itself
-	col_names (List[str]) - returns a list of the names of the columns
-
-Methods:
-	count(where, **kwargs) - counts the entries that meet the criteria in @where
-	delete(where, **kwargs) - deletes the entries which meet the criteria in @where
-	distinct(fields, where, limit, orderby, **kwargs) - selects entries with distinct @fields
-		that meet the criteria in @where ordered by @orderby; only returns @limit entries max
-	insert(fields, extra, **kwargs) - inserts the values in @fields
-	select(fields, where, limit, groupby, orderby, **kwargs) - selects the specified @fields
-		for entries that meet the criteria in @where grouped by @groupby and ordered by @orderby;
-		only returns @limit entries max
-	update(fields, where, **kwargs) - updates the given @fields for entries that meet the
-		criteria in @where
-	join(tbl, on, alias, direction) - returns a Table that allows for querying on the inner/left/
-		right joined with @tbl aliased as @alias on @on
-
-	"""
-
-	def __init__(self, db: Database, name: str, cols: list):
-		self._db = db
-		self._name = name
-		self._cols = cols
-
-	def __repr__(self):
-		"""
-Makes a str representation of self to display.
-		"""
-		return 'Table ' + self.name  + ': ' + ', '.join([i['Type'] + ' ' + i['Field'] for i in self._cols])
-
-	@property
-	def cols(self):
-		"""
-Returns a dict of column descriptions.
-		"""
-		return self._cols
-
-	@property
-	def name(self):
-		"""
-Returns the name of the table itself.
-		"""
-		return self._name
-	
-	@property
-	def col_names(self):
-		"""
-Returns a list of the column names.
-		"""
-		return [i['Field'] for i in self._cols]
-
-	def count(self, where: str = None, **kwargs):
-		"""
-Runs a 'count' SQL query on the table.
-@where specifies a condition to meet.
-		"""
-		where = 'WHERE ' + where if where else ''
-		return self._db.query('count', self._name, extra=where, **kwargs)
-
-	def delete(self, where: str = None, **kwargs):
-		"""
-Runs a 'delete' SQL query on the table.
-@where specifies a condition to meet.
-		"""
-		where = 'WHERE ' + where if where else ''
-		return self._db.query('delete', self._name, extra=where, **kwargs)
-
-	def distinct(self, fields = None, where: str = None, limit: int = None, orderby: str = None, **kwargs):
-		"""
-Runs a 'select distinct' SQL query on the table.
-@fields specifies what fields to be unique over as 'all' or list(str).
-@where specifies a condition to meet.
-@limit specifies the maximum number of rows to return.
-@orderby specifies what to order by.
-		"""
-		where = 'WHERE ' + where 		if where else ''
-		limit = 'LIMIT ' + str(limit)	if limit else ''
-		orderby = 'ORDER BY ' + orderby	if orderby else ''
-		return self._db.query('distinct', self._name, fields, where, **kwargs)
-
-	def insert(self, fields = None, extra: str = None, **kwargs):
-		"""
-Runs an 'insert' SQL query on the table.
-@fields specifies what values to insert as dict(field : value)
-@extra is tacked on the end of the query.
-		"""
-		return self._db.query('insert', self._name, fields, extra, **kwargs)
-
-	def select(self, fields = None, where: str = None, limit: int = None, groupby: str = None, orderby: str = None, **kwargs):
-		"""
-Runs a 'select' SQL query on the table.
-@fields specifies what fields to select as 'all' or list(str).
-@where specifies a condition to meet.
-@limit specifies the maximum number of rows to return.
-@groupby specifies what to group the data by
-@orderby specifies what to order by.
-		"""
-		where 	= 'WHERE ' + where 		if where else ''
-		limit 	= 'LIMIT ' + str(limit) if limit else ''
-		groupby = 'GROUP BY ' + groupby if groupby else ''
-		orderby = 'ORDER BY ' + orderby	if orderby else ''
-		return self._db.query('select', self._name, fields, ' '.join([where, limit, orderby, groupby]), **kwargs)
-
-	def update(self, fields = None, where: str = None, **kwargs):
-		"""
-Runs an 'update' SQL query on the table.
-@fields specifies what values to update to as dict(field : value)
-@where specifies a condition to meet.
-		"""
-		where = 'WHERE ' + where if where else ''
-		return self._db.query('update', self._name, fields, where, **kwargs)
-
-	def join(self, tbl, on: str, alias: str = None, direction: str = 'inner'):
-		"""
-Returns a Table of this table joined to @tbl.
-Returns None if there is an error.
-
-str @tbl is a Table object with .name and .cols{} properties.
-str @on specifies the joining condition.
-str @alias specifies the alias of @tbl.
-str @direction specifies 'inner', 'left', or 'right'; default 'inner'
-		"""
-		if not direction.lower() in ['inner', 'left', 'right']: return None
-
-		join = self.name + ' ' + direction.upper() + ' JOIN ' + tbl.name + ('AS ' + alias if alias else '') + ' ON ' + on
-		
-		cols = self.cols
-		for i in range(len(cols)):
-			cols[i]['Field'] = self.name + '.' + cols[i]['Field']
-
-		temp = tbl.cols
-		for i in range(len(temp)):
-			temp[i]['Field'] = tbl.name + '.' + temp[i]['Field']
-
-		cols += temp
-
-		return Table(self._db, join, cols)
 
 
 
