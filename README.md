@@ -32,3 +32,18 @@ I use this to see if different cell type counts for different samples could have
 Can also be given a list of observation matrices and returns the list of p-values.
 
 ###### All maths come from Wikipedia.
+
+
+## Licensing
+This collection of scripts under the umbrella term randompy is code
+I wrote in pursuit of my own work while at MIT.  
+Copyright (C) 2018 SC van Nostrand
+
+This code is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as
+published by the Free Software Foundation.
+
+This code is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
